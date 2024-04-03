@@ -20,7 +20,7 @@ public class Server {
     private static Map<Client, Timer> timers = new HashMap<>();
     private static Map<String, Client> requestHistory = new HashMap<>();
     private static double lossRate = 0;
-    private static final int TIMEOUT = 5000;
+    private static final int TIMEOUT = 60000;
 
     static class Client {
         InetAddress address;

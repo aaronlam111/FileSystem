@@ -16,11 +16,13 @@ public class Client {
     private static int freshness;
     private static final int TIMEOUT = 5000;
     private static final double lossRate = 0.1;
+
     public static void main(String[] args) {
         String host = "localhost";
         int port = 1234;
         String textPath = "src/Server/Files/text";
-        
+
+        // set freshness
         System.out.println("Enter the desired freshness for the cache: ");
         try {
             BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
@@ -32,16 +34,16 @@ public class Client {
 
         try (DatagramSocket socket = new DatagramSocket()) {
             socket.setSoTimeout(TIMEOUT);
-            //get the address of the server
+            // get the address of the server
             InetAddress address = InetAddress.getByName(host);
             BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
 
-            //send requests to the server until exit is entered
+            // send requests to the server until exit is entered
             while (true) {
                 System.out.println("Enter request:");
                 String request = input.readLine();
 
-                //check if the request is to exit or if it is a read request
+                // check if the request is to exit or if it is a read request
                 String[] requestParts = request.split(" ");
                 if (requestParts[0].equals("exit")) {
                     break;
@@ -60,48 +62,48 @@ public class Client {
                     System.out.println("Packet loss, reply not sent");
                     continue;
                 }
-                //send the request to the server
+                // send the request to server
                 byte[] buffer = request.getBytes();
                 DatagramPacket packet = new DatagramPacket(buffer, buffer.length, address, port);
                 socket.send(packet);
                 System.out.println("Request sent");
 
-                //receive the reply from the server
+                // receive the reply from server
                 byte[] replyBuffer = new byte[1024];
                 DatagramPacket replyPacket = new DatagramPacket(replyBuffer, replyBuffer.length);
 
-                //query reqeuest if reply is not received
+                // ask for new reqeuest if reply is not received
                 try {
                     socket.receive(replyPacket);
                 } catch (SocketTimeoutException e) {
                     System.out.println("No reply received");
                     continue;
                 }
-                //display reply
+
+                // display reply
                 String reply = new String(replyPacket.getData(), 0, replyPacket.getLength());
                 System.out.println(reply);
 
-                //check if server is asking for confirmation
+                // check if server is asking for confirmation
                 if (reply.contains("Did you mean to send a duplicate request (y)?")) {
                     String confirmation = input.readLine();
-                    if (confirmation.equals("y")) {
-                        DatagramPacket yesPacket = new DatagramPacket("y".getBytes(), 1, address, port);
-                        socket.send(yesPacket);
-                        System.out.println("Request is has been confirmed");
-            
-                        try {
-                            socket.receive(replyPacket);
-                        } catch (SocketTimeoutException e) {
-                            System.out.println("No reply received");
-                            continue;
-                        }
-                        System.out.println("Reply received");
-                        reply = new String(replyPacket.getData(), 0, replyPacket.getLength());
-                        System.out.println(reply);
+
+                    DatagramPacket confirmationPacket = new DatagramPacket(confirmation.getBytes(), 1, address, port);
+                    socket.send(confirmationPacket);
+
+                    try {
+                        socket.receive(replyPacket);
+                    } catch (SocketTimeoutException e) {
+                        System.out.println("No reply received");
+                        continue;
                     }
+                    reply = new String(replyPacket.getData(), 0, replyPacket.getLength());
+                    System.out.println(reply);
+
                 }
 
-                //check if the request is a write request and clear cache assiocated with the file
+                // check if the request is a write request and clear cache assiocated with the
+                // file
                 if (reply.contains("Successfully Written!")) {
                     Iterator<String> iterator = cache.keySet().iterator();
                     while (iterator.hasNext()) {
@@ -114,7 +116,7 @@ public class Client {
                     }
                 }
 
-                //check if the request is a read request and save the file to cache
+                // check if the request is a read request and save the file to cache
                 if (reply.contains("File:")) {
                     String[] replyParts = reply.split(": ");
                     byte[] file = replyParts[1].getBytes();
@@ -123,13 +125,13 @@ public class Client {
                     System.out.println("Content saved to cache");
                 }
 
-                //check if the request is monitoring a file
-                if (reply.contains("Monitoring")){
+                // check if the request is monitoring a file
+                if (reply.contains("Monitoring")) {
                     int start = reply.lastIndexOf("for ") + 4;
                     int end = reply.lastIndexOf(" seconds");
                     int time = Integer.parseInt(reply.substring(start, end));
                     long endTime = System.currentTimeMillis() + time * 1000;
-                    //receive updates until the time is up
+                    // receive updates until the time is up
                     while (System.currentTimeMillis() < endTime) {
                         socket.setSoTimeout(time * 1000);
                         try {
@@ -146,7 +148,7 @@ public class Client {
             System.out.println("Client closed");
         } catch (Exception e) {
             e.printStackTrace();
-        } 
+        }
     }
 
     private static boolean isCacheFresh(String filepath) {
