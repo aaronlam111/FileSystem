@@ -6,6 +6,8 @@ import java.io.RandomAccessFile;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.sql.Date;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -29,12 +31,14 @@ public class Server {
 
     public static void main(String[] args) throws Exception {
         try (DatagramSocket socket = new DatagramSocket(1234)) {
+            // prepare to receive request fom clients
             byte[] buffer = new byte[1024];
             DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
 
             System.out.println("Server started");
 
             while (true) {
+                //receive request from client
                 socket.receive(packet);
 
                 InetAddress clientAddress = packet.getAddress();
@@ -42,7 +46,7 @@ public class Server {
 
                 String request = new String(packet.getData(), 0, packet.getLength());
                 System.out.println("Received: " + request);
-
+                
                 String reply = processRequest(request, clientAddress, clientPort);
 
                 byte[] replyBuffer = reply.getBytes();
@@ -55,19 +59,21 @@ public class Server {
     }
 
     private static String processRequest(String request, InetAddress address, int port) {
+        //checks if the request is valid
         String[] parts = request.split(" ");
-        if (parts.length != 4 && parts.length != 3) {
+        if (parts.length != 4 && parts.length != 3 && parts.length != 2 && parts.length != 1) {
             return "Incorrect number of arguments";
         }
 
         String requestType = parts[0];
 
+        //process request based on number arguments and type
         if (parts.length == 4) {
             if (requestType.equals("read")) {
                 String filePath = parts[1];
                 int offset = Integer.parseInt(parts[2]);
                 int length = Integer.parseInt(parts[3]);
-                return readFile(filePath, offset, length);
+                return "File: " + readFile(filePath, offset, length);
 
             } else if (requestType.equals("write")) {
                 String filePath = parts[1];
@@ -86,11 +92,25 @@ public class Server {
             } else {
                 return "Invalid request type";
             }
+        } else if (parts.length == 2) {
+            if (requestType.equals("delete")) {
+                String filePath = parts[1];
+                return deleteFile(filePath);
+            } else {
+                return "Invalid request type";
+            }
+        } else if (parts.length == 1) {
+            if (requestType.equals("create")) {
+                return createFile();
+            } else {
+                return "Invalid request type";
+            }
         } else {
             return "Incorrect number of arguments";
         }
     }
 
+    //method to read content of file from offset to length
     private static String readFile(String filepath, int offset, int length) {
         try {
             File file = new File(filepath);
@@ -108,10 +128,6 @@ public class Server {
             byte[] buffer = new byte[length];
             int bytesRead = randomAccessFile.read(buffer, 0, buffer.length);
             randomAccessFile.close();
-            // FileInputStream fileInputStream = new FileInputStream(file);
-            // byte[] buffer = new byte[length];
-            // int bytesRead = fileInputStream.read(buffer, offset, buffer.length);
-            // fileInputStream.close();
             if (bytesRead > 0) {
                 return new String(buffer, 0, bytesRead);
             } else {
@@ -122,6 +138,7 @@ public class Server {
         }
     }
 
+    //method to write content to file from offset
     private static String writeFile(String filepath, int offset, String length) {
         try {
             File file = new File(filepath);
@@ -140,19 +157,19 @@ public class Server {
             randomAccessFile.write(remaining);
             randomAccessFile.close();
             updateClients(filepath);
-            return "Success: Write";
+            return "Successfully Written!";
         } catch (Exception e) {
             return "Write Error: " + e.getMessage();
         }
     }
 
+    //method to update clients monitoring the filepath
     private static void updateClients(String filepath) {
         List<Client> clientList = clients.get(filepath);
         File file = new File(filepath);
         if (clientList != null) {
             for (Client client : clientList) {
                 try {
-                    System.out.println("Sending update to " + client.address + ":" + client.port);
                     RandomAccessFile randomAccessFile = new RandomAccessFile(file, "r");
                     randomAccessFile.seek(0);
                     byte[] buffer = new byte[(int) randomAccessFile.length()];
@@ -181,6 +198,7 @@ public class Server {
         }
     }
 
+    //method to register client to monitor specified filepath for x amount of seconds
     private static String registerClient(String filePath, int time, InetAddress address, int port) {
         try {
             File file = new File(filePath);
@@ -210,6 +228,39 @@ public class Server {
             return "Monitoring filepath: " + filePath + " for " + time + " seconds";
         } catch (Exception e) {
             return "Register Error: " + e.getMessage();
+        }
+    }
+
+    //method to create a file using current timestamp
+    private static String createFile() {
+        String directory = "src/Server/Files/";
+        SimpleDateFormat date = new SimpleDateFormat("yyyyMMdd_HHmmss");
+        String timestamp = date.format(new Date(System.currentTimeMillis()));
+        String fileName = timestamp + ".txt";
+        String filePath = directory + fileName;
+        try {
+            File file = new File(filePath);
+            if (file.createNewFile()) {
+                return "File created: " + filePath;
+            } else {
+                return "File already exists";
+            }
+        } catch (IOException e) {
+            return "Create Error: " + e.getMessage();
+        }
+    }
+
+    //method to delete file at specified filepath
+    private static String deleteFile(String filePath) {
+        try {
+            File file = new File(filePath);
+            if (!file.exists()) {
+                return "File does not exist";
+            }
+            file.delete();
+            return "File Path: " + filePath + " has been deleted";
+        } catch (Exception e) {
+            return "Clear Error: " + e.getMessage();
         }
     }
 }
