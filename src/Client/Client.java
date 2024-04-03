@@ -88,6 +88,7 @@ public class Client {
                 if (reply.contains("Did you mean to send a duplicate request (y)?")) {
                     String confirmation = input.readLine();
 
+                    //send confirmation to server
                     DatagramPacket confirmationPacket = new DatagramPacket(confirmation.getBytes(), 1, address, port);
                     socket.send(confirmationPacket);
 
@@ -102,8 +103,7 @@ public class Client {
 
                 }
 
-                // check if the request is a write request and clear cache assiocated with the
-                // file
+                // check if the request is a write request and clear cache of file being written
                 if (reply.contains("Successfully Written!")) {
                     Iterator<String> iterator = cache.keySet().iterator();
                     while (iterator.hasNext()) {
@@ -125,7 +125,7 @@ public class Client {
                     System.out.println("Content saved to cache");
                 }
 
-                // check if the request is monitoring a file
+                // check if the request is monitoring a file and receive updates
                 if (reply.contains("Monitoring")) {
                     int start = reply.lastIndexOf("for ") + 4;
                     int end = reply.lastIndexOf(" seconds");
@@ -150,7 +150,7 @@ public class Client {
             e.printStackTrace();
         }
     }
-
+// check if the file in cache is fresh
     private static boolean isCacheFresh(String filepath) {
         long currentTime = System.currentTimeMillis() / 1000;
         return (currentTime - cacheTime.get(filepath)) < freshness;
