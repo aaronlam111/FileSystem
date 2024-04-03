@@ -8,17 +8,29 @@ import java.net.InetAddress;
 import java.net.SocketTimeoutException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Iterator;
 
 public class Client {
     private static final Map<String, byte[]> cache = new HashMap<>();
     private static final Map<String, Long> cacheTime = new HashMap<>();
-    private static final int FRESHNESS = 60;
+    private static int freshness;
     public static void main(String[] args) {
         String host = "localhost";
         int port = 1234;
         String textPath = "src/Server/Files/text";
+        int TIMEOUT = 5000;
+        
+        System.out.println("Enter the desired freshness for the cache: ");
+        try {
+            BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
+            freshness = Integer.parseInt(input.readLine());
+        } catch (Exception e) {
+            System.out.println("Invalid input, using default freshness of 60 seconds");
+            freshness = 60;
+        }
 
         try (DatagramSocket socket = new DatagramSocket()) {
+            socket.setSoTimeout(TIMEOUT);
             //get the address of the server
             InetAddress address = InetAddress.getByName(host);
             BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
@@ -49,9 +61,50 @@ public class Client {
                 //receive the reply from the server
                 byte[] replyBuffer = new byte[1024];
                 DatagramPacket replyPacket = new DatagramPacket(replyBuffer, replyBuffer.length);
-                socket.receive(replyPacket);
+
+                //query reqeuest if reply is not received
+                try {
+                    socket.receive(replyPacket);
+                } catch (SocketTimeoutException e) {
+                    System.out.println("No reply received");
+                    continue;
+                }
+                //display reply
                 String reply = new String(replyPacket.getData(), 0, replyPacket.getLength());
                 System.out.println(reply);
+
+                //check if server is asking for confirmation
+                if (reply.contains("Did you mean to send a duplicate request (y)?")) {
+                    String confirmation = input.readLine();
+                    if (confirmation.equals("y")) {
+                        DatagramPacket yesPacket = new DatagramPacket("y".getBytes(), 1, address, port);
+                        socket.send(yesPacket);
+                        System.out.println("Request is has been confirmed");
+            
+                        try {
+                            socket.receive(replyPacket);
+                        } catch (SocketTimeoutException e) {
+                            System.out.println("No reply received");
+                            continue;
+                        }
+                        System.out.println("Reply received");
+                        reply = new String(replyPacket.getData(), 0, replyPacket.getLength());
+                        System.out.println(reply);
+                    }
+                }
+                
+                //check if the request is a write request and clear cache assiocated with the file
+                if (reply.contains("Successfully Written!")) {
+                    Iterator<String> iterator = cache.keySet().iterator();
+                    while (iterator.hasNext()) {
+                        String filepath = iterator.next();
+                        if (filepath.contains(requestParts[1])) {
+                            iterator.remove();
+                            cacheTime.remove(filepath);
+                            System.out.println("Cache cleared");
+                        }
+                    }
+                }
 
                 //check if the request is a read request and save the file to cache
                 if (reply.contains("File:")) {
@@ -90,6 +143,6 @@ public class Client {
 
     private static boolean isCacheFresh(String filepath) {
         long currentTime = System.currentTimeMillis() / 1000;
-        return (currentTime - cacheTime.get(filepath)) < FRESHNESS;
+        return (currentTime - cacheTime.get(filepath)) < freshness;
     }
 }

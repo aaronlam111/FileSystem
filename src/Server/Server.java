@@ -18,6 +18,8 @@ import java.util.TimerTask;
 public class Server {
     private static Map<String, List<Client>> clients = new HashMap<>();
     private static Map<Client, Timer> timers = new HashMap<>();
+    private static Map<String, Client> requestHistory = new HashMap<>();
+    private static double lossRate = 0;
 
     static class Client {
         InetAddress address;
@@ -38,28 +40,45 @@ public class Server {
             System.out.println("Server started");
 
             while (true) {
-                //receive request from client
+                // receive request from client
                 socket.receive(packet);
 
-                InetAddress clientAddress = packet.getAddress();
-                int clientPort = packet.getPort();
-
+                Client client = new Client(packet.getAddress(), packet.getPort());
                 String request = new String(packet.getData(), 0, packet.getLength());
-                System.out.println("Received: " + request);
-                
-                String reply = processRequest(request, clientAddress, clientPort);
+                System.out.println("Received request: " + request);
 
+                String reply = processRequest(request, client, socket);
+                // simulating packet loss
+                double random = Math.random();
+                if (random < lossRate) {
+                    System.out.println("Packet loss, reply not sent");
+                    continue;
+                }
+
+                // reply to client
                 byte[] replyBuffer = reply.getBytes();
-                DatagramPacket replyPacket = new DatagramPacket(replyBuffer, replyBuffer.length, clientAddress,
-                        clientPort);
+                DatagramPacket replyPacket = new DatagramPacket(replyBuffer, replyBuffer.length, client.address,
+                        client.port);
                 socket.send(replyPacket);
-                System.out.println("Reply sent to " + clientAddress + ":" + clientPort + " - " + reply);
+                System.out.println("Reply sent to " + client.address + ":" + client.port + " - " + reply);
             }
         }
     }
 
-    private static String processRequest(String request, InetAddress address, int port) {
-        //checks if the request is valid
+    private static boolean sendConfirmation(Client client, DatagramSocket socket) throws IOException {
+        String reply = "Did you mean to send a duplicate request (y)?";
+        byte[] replyBuffer = reply.getBytes();
+        DatagramPacket replyPacket = new DatagramPacket(replyBuffer, replyBuffer.length, client.address, client.port);
+        socket.send(replyPacket);
+
+        DatagramPacket packet = new DatagramPacket(new byte[1024], 1024);
+        socket.receive(packet);
+        String request = new String(packet.getData(), 0, replyPacket.getLength());
+        return request.trim().equals("y");
+    }
+
+    private static String processRequest(String request, Client client, DatagramSocket socket) throws IOException {
+        // checks if the request is valid
         String[] parts = request.split(" ");
         if (parts.length != 4 && parts.length != 3 && parts.length != 2 && parts.length != 1) {
             return "Incorrect number of arguments";
@@ -67,7 +86,7 @@ public class Server {
 
         String requestType = parts[0];
 
-        //process request based on number arguments and type
+        // process request based on number arguments and type
         if (parts.length == 4) {
             if (requestType.equals("read")) {
                 String filePath = parts[1];
@@ -79,6 +98,14 @@ public class Server {
                 String filePath = parts[1];
                 int offset = Integer.parseInt(parts[2]);
                 String content = parts[3];
+                // check for duplicate requests
+                if (requestHistory.containsKey(request)) {
+                    if (!sendConfirmation(client, socket)) {
+                        System.out.println("Request not confirmed");
+                        return "Request not confirmed";
+                    } 
+                }
+                requestHistory.put(request, client);
                 return writeFile(filePath, offset, content);
 
             } else {
@@ -88,7 +115,7 @@ public class Server {
             if (requestType.equals("register")) {
                 String filePath = parts[1];
                 int time = Integer.parseInt(parts[2]);
-                return registerClient(filePath, time, address, port);
+                return registerClient(filePath, time, client.address, client.port);
             } else {
                 return "Invalid request type";
             }
@@ -110,7 +137,7 @@ public class Server {
         }
     }
 
-    //method to read content of file from offset to length
+    // method to read content of file from offset to length
     private static String readFile(String filepath, int offset, int length) {
         try {
             File file = new File(filepath);
@@ -138,7 +165,7 @@ public class Server {
         }
     }
 
-    //method to write content to file from offset
+    // method to write content to file from offset
     private static String writeFile(String filepath, int offset, String length) {
         try {
             File file = new File(filepath);
@@ -163,7 +190,7 @@ public class Server {
         }
     }
 
-    //method to update clients monitoring the filepath
+    // method to update clients monitoring the filepath
     private static void updateClients(String filepath) {
         List<Client> clientList = clients.get(filepath);
         File file = new File(filepath);
@@ -175,7 +202,7 @@ public class Server {
                     byte[] buffer = new byte[(int) randomAccessFile.length()];
                     int bytesRead = randomAccessFile.read(buffer, 0, buffer.length);
                     randomAccessFile.close();
-                    
+
                     if (bytesRead > 0) {
                         String content = new String(buffer, 0, bytesRead);
                         try (DatagramSocket socket = new DatagramSocket()) {
@@ -198,7 +225,8 @@ public class Server {
         }
     }
 
-    //method to register client to monitor specified filepath for x amount of seconds
+    // method to register client to monitor specified filepath for x amount of
+    // seconds
     private static String registerClient(String filePath, int time, InetAddress address, int port) {
         try {
             File file = new File(filePath);
@@ -213,7 +241,7 @@ public class Server {
                 clientList.add(new Client(address, port));
                 clients.put(filePath, clientList);
             }
-            
+
             Timer timer = new Timer();
             timer.schedule(new TimerTask() {
                 @Override
@@ -231,7 +259,7 @@ public class Server {
         }
     }
 
-    //method to create a file using current timestamp
+    // method to create a file using current timestamp
     private static String createFile() {
         String directory = "src/Server/Files/";
         SimpleDateFormat date = new SimpleDateFormat("yyyyMMdd_HHmmss");
@@ -250,7 +278,7 @@ public class Server {
         }
     }
 
-    //method to delete file at specified filepath
+    // method to delete file at specified filepath
     private static String deleteFile(String filePath) {
         try {
             File file = new File(filePath);
