@@ -1,7 +1,6 @@
 package Server;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.net.DatagramPacket;
@@ -58,7 +57,7 @@ public class Server {
     private static String processRequest(String request, InetAddress address, int port) {
         String[] parts = request.split(" ");
         if (parts.length != 4 && parts.length != 3) {
-            return "Invalid request";
+            return "Incorrect number of arguments";
         }
 
         String requestType = parts[0];
@@ -77,7 +76,7 @@ public class Server {
                 return writeFile(filePath, offset, content);
 
             } else {
-                return "Invalid request";
+                return "Invalid request type";
             }
         } else if (parts.length == 3) {
             if (requestType.equals("register")) {
@@ -85,10 +84,10 @@ public class Server {
                 int time = Integer.parseInt(parts[2]);
                 return registerClient(filePath, time, address, port);
             } else {
-                return "Invalid request";
+                return "Invalid request type";
             }
         } else {
-            return "Invalid request";
+            return "Incorrect number of arguments";
         }
     }
 
@@ -104,17 +103,22 @@ public class Server {
             if (offset + length > file.length()) {
                 return "Offset + length is greater than file length";
             }
-            FileInputStream fileInputStream = new FileInputStream(file);
+            RandomAccessFile randomAccessFile = new RandomAccessFile(file, "r");
+            randomAccessFile.seek(offset);
             byte[] buffer = new byte[length];
-            int bytesRead = fileInputStream.read(buffer, offset, buffer.length);
-            fileInputStream.close();
+            int bytesRead = randomAccessFile.read(buffer, 0, buffer.length);
+            randomAccessFile.close();
+            // FileInputStream fileInputStream = new FileInputStream(file);
+            // byte[] buffer = new byte[length];
+            // int bytesRead = fileInputStream.read(buffer, offset, buffer.length);
+            // fileInputStream.close();
             if (bytesRead > 0) {
                 return new String(buffer, 0, bytesRead);
             } else {
                 return "Unable to read file";
             }
         } catch (Exception e) {
-            return "Error: " + e.getMessage();
+            return "ReadFile Error: " + e.getMessage();
         }
     }
 
@@ -136,9 +140,9 @@ public class Server {
             randomAccessFile.write(remaining);
             randomAccessFile.close();
             updateClients(filepath);
-            return "Success";
+            return "Success: Write";
         } catch (Exception e) {
-            return "Error: " + e.getMessage();
+            return "Write Error: " + e.getMessage();
         }
     }
 
@@ -148,11 +152,13 @@ public class Server {
         if (clientList != null) {
             for (Client client : clientList) {
                 try {
-                    FileInputStream fileInputStream = new FileInputStream(file);
-                    byte[] buffer = new byte[(int) file.length()];
-                    int bytesRead;
-                    bytesRead = fileInputStream.read(buffer, 0, buffer.length);
-                    fileInputStream.close();
+                    System.out.println("Sending update to " + client.address + ":" + client.port);
+                    RandomAccessFile randomAccessFile = new RandomAccessFile(file, "r");
+                    randomAccessFile.seek(0);
+                    byte[] buffer = new byte[(int) randomAccessFile.length()];
+                    int bytesRead = randomAccessFile.read(buffer, 0, buffer.length);
+                    randomAccessFile.close();
+                    
                     if (bytesRead > 0) {
                         String content = new String(buffer, 0, bytesRead);
                         try (DatagramSocket socket = new DatagramSocket()) {
@@ -167,6 +173,7 @@ public class Server {
                             e.printStackTrace();
                         }
                     }
+
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -188,19 +195,21 @@ public class Server {
                 clientList.add(new Client(address, port));
                 clients.put(filePath, clientList);
             }
+            
             Timer timer = new Timer();
             timer.schedule(new TimerTask() {
                 @Override
                 public void run() {
                     clients.get(filePath).removeIf(client -> client.address.equals(address) && client.port == port);
                     timers.remove(new Client(address, port));
+                    System.out.println("Client removed: " + address + ":" + port);
                 }
             }, time * 1000);
             timers.put(new Client(address, port), timer);
 
             return "Monitoring filepath: " + filePath + " for " + time + " seconds";
         } catch (Exception e) {
-            return "Error: " + e.getMessage();
+            return "Register Error: " + e.getMessage();
         }
     }
 }

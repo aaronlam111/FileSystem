@@ -5,6 +5,7 @@ import java.io.InputStreamReader;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.SocketTimeoutException;
 
 public class Client {
     public static void main(String[] args) {
@@ -38,16 +39,21 @@ public class Client {
                     int time = Integer.parseInt(reply.substring(start, end));
                     long endTime = System.currentTimeMillis() + time * 1000;
                     while (System.currentTimeMillis() < endTime) {
-                        socket.receive(replyPacket);
-                        reply = new String(replyPacket.getData(), 0, replyPacket.getLength());
-                        System.out.println("Reply received: " + reply);
-                        Thread.sleep(500);
+                        socket.setSoTimeout(time * 1000);
+                        try {
+                            socket.receive(replyPacket);
+                            reply = new String(replyPacket.getData(), 0, replyPacket.getLength());
+                            System.out.println("Update received: " + reply);
+                        } catch (SocketTimeoutException e) {
+                            System.out.println("All replies received");
+                            continue;
+                        }
                     }
                 }
             }
         
         } catch (Exception e) {
             e.printStackTrace();
-        }
+        } 
     }
 }
