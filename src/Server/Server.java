@@ -20,6 +20,7 @@ public class Server {
     private static Map<Client, Timer> timers = new HashMap<>();
     private static Map<String, Client> requestHistory = new HashMap<>();
     private static double lossRate = 0;
+    private static final int TIMEOUT = 5000;
 
     static class Client {
         InetAddress address;
@@ -34,6 +35,7 @@ public class Server {
     public static void main(String[] args) throws Exception {
         try (DatagramSocket socket = new DatagramSocket(1234)) {
             // prepare to receive request fom clients
+            socket.setSoTimeout(TIMEOUT);
             byte[] buffer = new byte[1024];
             DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
 
@@ -103,7 +105,7 @@ public class Server {
                     if (!sendConfirmation(client, socket)) {
                         System.out.println("Request not confirmed");
                         return "Request not confirmed";
-                    } 
+                    }
                 }
                 requestHistory.put(request, client);
                 return writeFile(filePath, offset, content);
@@ -128,6 +130,14 @@ public class Server {
             }
         } else if (parts.length == 1) {
             if (requestType.equals("create")) {
+                // check for duplicate requests
+                if (requestHistory.containsKey(request)) {
+                    if (!sendConfirmation(client, socket)) {
+                        System.out.println("Request not confirmed");
+                        return "Request not confirmed";
+                    }
+                }
+                requestHistory.put(request, client);
                 return createFile();
             } else {
                 return "Invalid request type";

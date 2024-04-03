@@ -14,11 +14,12 @@ public class Client {
     private static final Map<String, byte[]> cache = new HashMap<>();
     private static final Map<String, Long> cacheTime = new HashMap<>();
     private static int freshness;
+    private static final int TIMEOUT = 5000;
+    private static final double lossRate = 0.1;
     public static void main(String[] args) {
         String host = "localhost";
         int port = 1234;
         String textPath = "src/Server/Files/text";
-        int TIMEOUT = 5000;
         
         System.out.println("Enter the desired freshness for the cache: ");
         try {
@@ -51,6 +52,13 @@ public class Client {
                         System.out.println("Cache: " + new String(file));
                         continue;
                     }
+                }
+
+                // simulating packet loss
+                double random = Math.random();
+                if (random < lossRate) {
+                    System.out.println("Packet loss, reply not sent");
+                    continue;
                 }
                 //send the request to the server
                 byte[] buffer = request.getBytes();
@@ -92,7 +100,7 @@ public class Client {
                         System.out.println(reply);
                     }
                 }
-                
+
                 //check if the request is a write request and clear cache assiocated with the file
                 if (reply.contains("Successfully Written!")) {
                     Iterator<String> iterator = cache.keySet().iterator();
