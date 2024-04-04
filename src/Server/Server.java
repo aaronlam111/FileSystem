@@ -50,7 +50,6 @@ public class Server {
 
                 //extract request from packet and print to console
                 String request = Util.unmarshal(packet.getData());
-                //String request = new String(packet.getData(), 0, packet.getLength());
                 System.out.println("Received request: " + request);
                 
                 String reply = processRequest(request, client, socket);
@@ -64,7 +63,6 @@ public class Server {
 
                 // reply to client
                 byte[] replyBuffer = Util.marshal(reply);
-                //byte[] replyBuffer = reply.getBytes();
                 DatagramPacket replyPacket = new DatagramPacket(replyBuffer, replyBuffer.length, client.address,
                         client.port);
                 socket.send(replyPacket);
@@ -152,14 +150,12 @@ public class Server {
         private static boolean sendConfirmation(Client client, DatagramSocket socket) throws IOException {
             String reply = "Did you mean to send a duplicate request (y)?";
             byte[] replyBuffer = Util.marshal(reply);
-            //byte[] replyBuffer = reply.getBytes();
             DatagramPacket replyPacket = new DatagramPacket(replyBuffer, replyBuffer.length, client.address, client.port);
             socket.send(replyPacket);
     
             DatagramPacket packet = new DatagramPacket(new byte[1024], 1024);
             socket.receive(packet);
             String request = Util.unmarshal(packet.getData());
-            //String request = new String(packet.getData(), 0, replyPacket.getLength());
             return request.trim().equals("y");
         }
 

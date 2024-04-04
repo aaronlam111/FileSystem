@@ -65,7 +65,6 @@ public class Client {
                     continue;
                 }
                 // send the request to server
-                //byte[] buffer = request.getBytes();
                 byte[] marshalledRequest = marshal(request);
                 DatagramPacket packet = new DatagramPacket(marshalledRequest, marshalledRequest.length, address, port);
                 socket.send(packet);
@@ -84,7 +83,6 @@ public class Client {
                 }
 
                 // display reply
-                //String reply = new String(replyPacket.getData(), 0, replyPacket.getLength());
                 String reply = unmarshal(replyPacket.getData());
                 System.out.println(reply);
 
@@ -104,7 +102,6 @@ public class Client {
                         continue;
                     }
                     reply = unmarshal(replyPacket.getData());
-                    //reply = new String(replyPacket.getData(), 0, replyPacket.getLength());
                     System.out.println(reply);
 
                 }
@@ -143,7 +140,6 @@ public class Client {
                         try {
                             socket.receive(replyPacket);
                             reply = unmarshal(replyPacket.getData());
-                            //reply = new String(replyPacket.getData(), 0, replyPacket.getLength());
                             System.out.println("Update received: " + reply);
                         } catch (SocketTimeoutException e) {
                             System.out.println("All replies received");
