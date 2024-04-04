@@ -35,21 +35,21 @@ public class Server {
     public static void main(String[] args) throws Exception {
         try (DatagramSocket socket = new DatagramSocket(1234)) {
             // prepare to receive request fom clients
-            byte[] buffer = new byte[1024];
-            DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
             System.out.println("Server started");
 
             while (true) {
                 // receive request from client
+                byte[] buffer = new byte[1024];
+                DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
                 socket.receive(packet);
 
-                //create client based off packet address and port
+                // create client based off packet address and port
                 Client client = new Client(packet.getAddress(), packet.getPort());
 
-                //extract request from packet and print to console
+                // extract request from packet and print to console
                 String request = Util.unmarshal(packet.getData());
                 System.out.println("Received request: " + request);
-                
+
                 String reply = processRequest(request, client, socket);
 
                 // simulating packet loss
@@ -81,40 +81,51 @@ public class Server {
         // process request based on number arguments and type
         if (parts.length == 4) {
             if (requestType.equals("read")) {
-                //parse request arguments
-                String filePath = parts[1];
-                int offset = Integer.parseInt(parts[2]);
-                int length = Integer.parseInt(parts[3]);
-                // return file content
-                return "File: " + readFile(filePath, offset, length);
+                // parse request arguments
+                try {
+                    String filePath = parts[1];
+                    int offset = Integer.parseInt(parts[2]);
+                    int length = Integer.parseInt(parts[3]);
+                    // return file content
+                    return "File: " + readFile(filePath, offset, length);
+                } catch (Exception e) {
+                    return "Invalid arguments";
+                }
 
             } else if (requestType.equals("write")) {
-                //parse request arguments
-                String filePath = parts[1];
-                int offset = Integer.parseInt(parts[2]);
-                String content = parts[3];
-                // check for duplicate requests
-                if (requestHistory.containsKey(request)) {
-                    if (!sendConfirmation(client, socket)) {
-                        System.out.println("Request not confirmed");
-                        return "Request not confirmed";
+                try {
+                    // parse request arguments
+                    String filePath = parts[1];
+                    int offset = Integer.parseInt(parts[2]);
+                    String content = parts[3];
+                    // check for duplicate requests
+                    if (requestHistory.containsKey(request)) {
+                        if (!sendConfirmation(client, socket)) {
+                            System.out.println("Request not confirmed");
+                            return "Request not confirmed";
+                        }
                     }
+                    // stores request in history
+                    requestHistory.put(request, client);
+                    // write content to file
+                    return writeFile(filePath, offset, content);
+                } catch (Exception e) {
+                    return "Invalid arguments";
                 }
-                //stores request in history
-                requestHistory.put(request, client);
-                // write content to file
-                return writeFile(filePath, offset, content);
-
             } else {
                 return "Invalid request type";
             }
         } else if (parts.length == 3) {
             if (requestType.equals("register")) {
-                //parse request arguments
-                String filePath = parts[1];
-                int time = Integer.parseInt(parts[2]);
-                //register client to monitor file
-                return registerClient(filePath, time, client.address, client.port);
+                try {
+                    // parse request arguments
+                    String filePath = parts[1];
+                    int time = Integer.parseInt(parts[2]);
+                    // register client to monitor file
+                    return registerClient(filePath, time, client.address, client.port);
+                } catch (Exception e) {
+                    return "Invalid arguments";
+                }
             } else {
                 return "Invalid request type";
             }
@@ -144,24 +155,24 @@ public class Server {
         }
     }
 
-        //method to ask for confirmation of duplicate request from client
-        private static boolean sendConfirmation(Client client, DatagramSocket socket) throws IOException {
-            String reply = "Did you mean to send a duplicate request (y)?";
-            byte[] replyBuffer = Util.marshal(reply);
-            DatagramPacket replyPacket = new DatagramPacket(replyBuffer, replyBuffer.length, client.address, client.port);
-            socket.send(replyPacket);
-    
-            DatagramPacket packet = new DatagramPacket(new byte[1024], 1024);
-            socket.receive(packet);
-            String request = Util.unmarshal(packet.getData());
-            return request.trim().equals("y");
-        }
+    // method to ask for confirmation of duplicate request from client
+    private static boolean sendConfirmation(Client client, DatagramSocket socket) throws IOException {
+        String reply = "Did you mean to send a duplicate request (y)?";
+        byte[] replyBuffer = Util.marshal(reply);
+        DatagramPacket replyPacket = new DatagramPacket(replyBuffer, replyBuffer.length, client.address, client.port);
+        socket.send(replyPacket);
+
+        DatagramPacket packet = new DatagramPacket(new byte[1024], 1024);
+        socket.receive(packet);
+        String request = Util.unmarshal(packet.getData());
+        return request.trim().equals("y");
+    }
 
     // method to read content of file from offset to length
     private static String readFile(String filepath, int offset, int length) {
         try {
             File file = new File(filepath);
-            //checks if file exists and if offset and length are valid
+            // checks if file exists and if offset and length are valid
             if (!file.exists()) {
                 return "Error - File does not exist";
             }
@@ -171,13 +182,13 @@ public class Server {
             if (offset + length > file.length()) {
                 return "Error - Offset + length is greater than file length";
             }
-    
+
             RandomAccessFile randomAccessFile = new RandomAccessFile(file, "r");
             randomAccessFile.seek(offset);
             byte[] buffer = new byte[length];
             int bytesRead = randomAccessFile.read(buffer, 0, buffer.length);
             randomAccessFile.close();
-            //if bytes are read, return content
+            // if bytes are read, return content
             if (bytesRead > 0) {
                 return new String(buffer, 0, bytesRead);
             } else {
@@ -192,7 +203,7 @@ public class Server {
     private static String writeFile(String filepath, int offset, String length) {
         try {
             File file = new File(filepath);
-            //checks if file exists and if offset is valid
+            // checks if file exists and if offset is valid
             if (!file.exists()) {
                 return "Error - File does not exist";
             }
@@ -200,17 +211,17 @@ public class Server {
                 return "Error - Offset is greater than file length";
             }
             RandomAccessFile randomAccessFile = new RandomAccessFile(file, "rw");
-            //stores bytes to be over written
+            // stores bytes to be over written
             randomAccessFile.seek(offset);
             byte[] remaining = new byte[(int) randomAccessFile.length() - offset];
             randomAccessFile.read(remaining);
-            //set pointer to offset and write content
+            // set pointer to offset and write content
             randomAccessFile.seek(offset);
             randomAccessFile.write(length.getBytes());
-            //write remaining bytes that were overwritten
+            // write remaining bytes that were overwritten
             randomAccessFile.write(remaining);
             randomAccessFile.close();
-            //update clients monitoring the file
+            // update clients monitoring the file
             updateClients(filepath);
             return "Successfully Written!";
         } catch (Exception e) {
@@ -253,25 +264,26 @@ public class Server {
         }
     }
 
-    // method to register client to monitor specified filepath for x amount of seconds
+    // method to register client to monitor specified filepath for x amount of
+    // seconds
     private static String registerClient(String filePath, int time, InetAddress address, int port) {
         try {
             File file = new File(filePath);
             if (!file.exists()) {
                 return "Error - File does not exist";
             }
-            //add client to list of clients already mointoring filepath
+            // add client to list of clients already mointoring filepath
             if (clients.containsKey(filePath)) {
                 List<Client> clientList = clients.get(filePath);
                 clientList.add(new Client(address, port));
-            } 
-            //create new list of clients monitoring filepath
+            }
+            // create new list of clients monitoring filepath
             else {
                 List<Client> clientList = new ArrayList<>();
                 clientList.add(new Client(address, port));
                 clients.put(filePath, clientList);
             }
-            //create timer to remove the client after x seconds
+            // create timer to remove the client after x seconds
             Timer timer = new Timer();
             timer.schedule(new TimerTask() {
                 @Override
@@ -281,7 +293,7 @@ public class Server {
                     System.out.println("Client removed: " + address + ":" + port);
                 }
             }, time * 1000);
-            //store client and timer
+            // store client and timer
             timers.put(new Client(address, port), timer);
 
             return "Monitoring filepath: " + filePath + " for " + time + " seconds";

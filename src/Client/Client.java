@@ -27,8 +27,8 @@ public class Client {
         // set freshness
         System.out.println("Enter the desired freshness for the cache: ");
         try {
-            BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
-            freshness = Integer.parseInt(input.readLine());
+            BufferedReader freshinput = new BufferedReader(new InputStreamReader(System.in));
+            freshness = Integer.parseInt(freshinput.readLine());
         } catch (Exception e) {
             System.out.println("Invalid input, using default freshness of 60 seconds");
             freshness = 60;
@@ -38,11 +38,11 @@ public class Client {
             socket.setSoTimeout(TIMEOUT);
             // get the address of the server
             InetAddress address = InetAddress.getByName(host);
-            BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
 
             // send requests to the server until exit is entered
             while (true) {
                 System.out.println("Enter request:");
+                BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
                 String request = input.readLine();
 
                 // check if the request is to exit or if it is a read request
@@ -88,22 +88,24 @@ public class Client {
 
                 // check if server is asking for confirmation
                 if (reply.contains("Did you mean to send a duplicate request (y)?")) {
-                    String confirmation = input.readLine();
-
+                    BufferedReader confirmInput = new BufferedReader(new InputStreamReader(System.in));
+                    String confirmation = confirmInput.readLine();
                     //send confirmation to server
                     byte[] marshalledConfirmation = marshal(confirmation);
                     DatagramPacket confirmationPacket = new DatagramPacket(marshalledConfirmation, marshalledConfirmation.length, address, port);
                     socket.send(confirmationPacket);
 
                     try {
-                        socket.receive(replyPacket);
+                        byte[] buffer = new byte[1024];
+                        DatagramPacket confirmPacket = new DatagramPacket(buffer, buffer.length);
+
+                        socket.receive(confirmPacket);
+                        reply = unmarshal(confirmPacket.getData());
+                        System.out.println(reply);
                     } catch (SocketTimeoutException e) {
                         System.out.println("No reply received");
                         continue;
                     }
-                    reply = unmarshal(replyPacket.getData());
-                    System.out.println(reply);
-
                 }
 
                 // check if the request is a write request and clear cache of file being written
@@ -138,8 +140,11 @@ public class Client {
                     while (System.currentTimeMillis() < endTime) {
                         socket.setSoTimeout(time * 1000);
                         try {
-                            socket.receive(replyPacket);
-                            reply = unmarshal(replyPacket.getData());
+                            byte[] buffer = new byte[1024];
+                            DatagramPacket monitorPacket = new DatagramPacket(buffer, buffer.length);
+
+                            socket.receive(monitorPacket);
+                            reply = unmarshal(monitorPacket.getData());
                             System.out.println("Update received: " + reply);
                         } catch (SocketTimeoutException e) {
                             System.out.println("All replies received");
