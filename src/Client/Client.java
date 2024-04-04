@@ -17,7 +17,7 @@ public class Client {
     private static final Map<String, Long> cacheTime = new HashMap<>();
     private static int freshness;
     private static final int TIMEOUT = 5000;
-    private static final double lossRate = 0.1;
+    private static final double lossRate = 0;
 
     public static void main(String[] args) {
         String host = "localhost";
@@ -61,14 +61,15 @@ public class Client {
                 // simulating packet loss
                 double random = Math.random();
                 if (random < lossRate) {
-                    System.out.println("Packet loss, reply not sent");
-                    continue;
+                    System.out.println("Simulating packet loss");
+                    
+                } else {
+                    // send the request to server
+                    byte[] marshalledRequest = marshal(request);
+                    DatagramPacket packet = new DatagramPacket(marshalledRequest, marshalledRequest.length, address, port);
+                    socket.send(packet);
+                    System.out.println("Request sent");
                 }
-                // send the request to server
-                byte[] marshalledRequest = marshal(request);
-                DatagramPacket packet = new DatagramPacket(marshalledRequest, marshalledRequest.length, address, port);
-                socket.send(packet);
-                System.out.println("Request sent");
 
                 // receive the reply from server
                 byte[] replyBuffer = new byte[1024];
@@ -78,7 +79,7 @@ public class Client {
                 try {
                     socket.receive(replyPacket);
                 } catch (SocketTimeoutException e) {
-                    System.out.println("No reply received");
+                    System.out.println("No reply received or packet loss");
                     continue;
                 }
 
