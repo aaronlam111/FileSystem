@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
+import Util.Util;
 
 public class Server {
     private static Map<String, List<Client>> clients = new HashMap<>();
@@ -48,7 +49,8 @@ public class Server {
                 Client client = new Client(packet.getAddress(), packet.getPort());
 
                 //extract request from packet and print to console
-                String request = new String(packet.getData(), 0, packet.getLength());
+                String request = Util.unmarshal(packet.getData());
+                //String request = new String(packet.getData(), 0, packet.getLength());
                 System.out.println("Received request: " + request);
                 
                 String reply = processRequest(request, client, socket);
@@ -61,7 +63,8 @@ public class Server {
                 }
 
                 // reply to client
-                byte[] replyBuffer = reply.getBytes();
+                byte[] replyBuffer = Util.marshal(reply);
+                //byte[] replyBuffer = reply.getBytes();
                 DatagramPacket replyPacket = new DatagramPacket(replyBuffer, replyBuffer.length, client.address,
                         client.port);
                 socket.send(replyPacket);
@@ -148,13 +151,15 @@ public class Server {
         //method to ask for confirmation of duplicate request from client
         private static boolean sendConfirmation(Client client, DatagramSocket socket) throws IOException {
             String reply = "Did you mean to send a duplicate request (y)?";
-            byte[] replyBuffer = reply.getBytes();
+            byte[] replyBuffer = Util.marshal(reply);
+            //byte[] replyBuffer = reply.getBytes();
             DatagramPacket replyPacket = new DatagramPacket(replyBuffer, replyBuffer.length, client.address, client.port);
             socket.send(replyPacket);
     
             DatagramPacket packet = new DatagramPacket(new byte[1024], 1024);
             socket.receive(packet);
-            String request = new String(packet.getData(), 0, replyPacket.getLength());
+            String request = Util.unmarshal(packet.getData());
+            //String request = new String(packet.getData(), 0, replyPacket.getLength());
             return request.trim().equals("y");
         }
 
@@ -164,13 +169,13 @@ public class Server {
             File file = new File(filepath);
             //checks if file exists and if offset and length are valid
             if (!file.exists()) {
-                return "File does not exist";
+                return "Error - File does not exist";
             }
             if (offset >= file.length()) {
-                return "Offset is greater than file length";
+                return "Error - Offset is greater than file length";
             }
             if (offset + length > file.length()) {
-                return "Offset + length is greater than file length";
+                return "Error - Offset + length is greater than file length";
             }
     
             RandomAccessFile randomAccessFile = new RandomAccessFile(file, "r");
@@ -182,7 +187,7 @@ public class Server {
             if (bytesRead > 0) {
                 return new String(buffer, 0, bytesRead);
             } else {
-                return "Unable to read file";
+                return "Error - Unable to read file";
             }
         } catch (Exception e) {
             return "ReadFile Error: " + e.getMessage();
@@ -195,10 +200,10 @@ public class Server {
             File file = new File(filepath);
             //checks if file exists and if offset is valid
             if (!file.exists()) {
-                return "File does not exist";
+                return "Error - File does not exist";
             }
             if (offset >= file.length()) {
-                return "Offset is greater than file length";
+                return "Error - Offset is greater than file length";
             }
             RandomAccessFile randomAccessFile = new RandomAccessFile(file, "rw");
             //stores bytes to be over written
@@ -259,7 +264,7 @@ public class Server {
         try {
             File file = new File(filePath);
             if (!file.exists()) {
-                return "File does not exist";
+                return "Error - File does not exist";
             }
             //add client to list of clients already mointoring filepath
             if (clients.containsKey(filePath)) {
@@ -303,7 +308,7 @@ public class Server {
             if (file.createNewFile()) {
                 return "File created: " + filePath;
             } else {
-                return "File already exists";
+                return "Error - File already exists";
             }
         } catch (IOException e) {
             return "Create Error: " + e.getMessage();
@@ -315,7 +320,7 @@ public class Server {
         try {
             File file = new File(filePath);
             if (!file.exists()) {
-                return "File does not exist";
+                return "Error - File does not exist";
             }
             file.delete();
             return "File Path: " + filePath + " has been deleted";

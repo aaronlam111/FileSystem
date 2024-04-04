@@ -9,6 +9,8 @@ import java.net.SocketTimeoutException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Iterator;
+import static Util.Util.marshal;
+import static Util.Util.unmarshal;
 
 public class Client {
     private static final Map<String, byte[]> cache = new HashMap<>();
@@ -63,8 +65,9 @@ public class Client {
                     continue;
                 }
                 // send the request to server
-                byte[] buffer = request.getBytes();
-                DatagramPacket packet = new DatagramPacket(buffer, buffer.length, address, port);
+                //byte[] buffer = request.getBytes();
+                byte[] marshalledRequest = marshal(request);
+                DatagramPacket packet = new DatagramPacket(marshalledRequest, marshalledRequest.length, address, port);
                 socket.send(packet);
                 System.out.println("Request sent");
 
@@ -81,7 +84,8 @@ public class Client {
                 }
 
                 // display reply
-                String reply = new String(replyPacket.getData(), 0, replyPacket.getLength());
+                //String reply = new String(replyPacket.getData(), 0, replyPacket.getLength());
+                String reply = unmarshal(replyPacket.getData());
                 System.out.println(reply);
 
                 // check if server is asking for confirmation
@@ -89,7 +93,8 @@ public class Client {
                     String confirmation = input.readLine();
 
                     //send confirmation to server
-                    DatagramPacket confirmationPacket = new DatagramPacket(confirmation.getBytes(), 1, address, port);
+                    byte[] marshalledConfirmation = marshal(confirmation);
+                    DatagramPacket confirmationPacket = new DatagramPacket(marshalledConfirmation, marshalledConfirmation.length, address, port);
                     socket.send(confirmationPacket);
 
                     try {
@@ -98,7 +103,8 @@ public class Client {
                         System.out.println("No reply received");
                         continue;
                     }
-                    reply = new String(replyPacket.getData(), 0, replyPacket.getLength());
+                    reply = unmarshal(replyPacket.getData());
+                    //reply = new String(replyPacket.getData(), 0, replyPacket.getLength());
                     System.out.println(reply);
 
                 }
@@ -117,7 +123,7 @@ public class Client {
                 }
 
                 // check if the request is a read request and save the file to cache
-                if (reply.contains("File:")) {
+                if (reply.contains("File:") && !reply.contains("Error")) {
                     String[] replyParts = reply.split(": ");
                     byte[] file = replyParts[1].getBytes();
                     cache.put(request, file);
@@ -136,7 +142,8 @@ public class Client {
                         socket.setSoTimeout(time * 1000);
                         try {
                             socket.receive(replyPacket);
-                            reply = new String(replyPacket.getData(), 0, replyPacket.getLength());
+                            reply = unmarshal(replyPacket.getData());
+                            //reply = new String(replyPacket.getData(), 0, replyPacket.getLength());
                             System.out.println("Update received: " + reply);
                         } catch (SocketTimeoutException e) {
                             System.out.println("All replies received");
@@ -150,7 +157,8 @@ public class Client {
             e.printStackTrace();
         }
     }
-// check if the file in cache is fresh
+
+    // check if the file in cache is fresh
     private static boolean isCacheFresh(String filepath) {
         long currentTime = System.currentTimeMillis() / 1000;
         return (currentTime - cacheTime.get(filepath)) < freshness;
